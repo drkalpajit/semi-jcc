@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resident Journal Club | SEMI Karnataka State Chapter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Open+Sans:wght@400;600&display=swap');
+        
+        :root {
+            --semi-navy: #1a237e;
+            --semi-red: #cc0000;
+        }
+
+        body { font-family: 'Open Sans', sans-serif; }
+        h1, h2, h3, h4, .font-heading { font-family: 'Montserrat', sans-serif; }
+        
+        .bg-semi-navy { background-color: var(--semi-navy); }
+        .text-semi-navy { color: var(--semi-navy); }
+        
+        .hero-pattern {
+            background-color: #ffffff;
+            background-image: radial-gradient(var(--semi-navy) 0.5px, transparent 0);
+            background-size: 24px 24px;
+        }
+
+        .winner-glow { box-shadow: 0 0 15px rgba(26, 35, 126, 0.15); }
+
+        .gold-badge {
+            background: linear-gradient(135deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
+            color: #1a237e;
+        }
+
+        .custom-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0; top: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.6);
+            backdrop-filter: blur(8px);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .admin-only { display: none; }
+        .loading-spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+    <!-- AI Modal -->
+    <div id="aiModal" class="custom-modal">
+        <div class="bg-white rounded-2xl max-w-2xl w-full mx-4 overflow-hidden shadow-2xl border border-white/20">
+            <div class="bg-semi-navy p-6 text-white flex justify-between items-center">
+                <h3 class="font-bold text-lg flex items-center">
+                    <span class="mr-2">✨</span> SEMI Academic Assistant
+                </h3>
+                <button onclick="closeModal('aiModal')" class="text-white/70 hover:text-white text-2xl transition">&times;</button>
+            </div>
+            <div id="modalContent" class="p-8 max-h-[70vh] overflow-y-auto text-slate-700 leading-relaxed">
+                <div id="loadingState" class="hidden text-center">
+                    <div class="animate-pulse space-y-4">
+                        <div class="h-4 bg-slate-200 rounded w-3/4 mx-auto"></div>
+                        <div class="h-4 bg-slate-200 rounded mx-auto"></div>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-6 italic font-bold uppercase">Analyzing Medical Literature...</p>
+                </div>
+                <div id="aiResponseText" class="prose prose-slate max-w-none"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Login Modal -->
+    <div id="adminModal" class="custom-modal">
+        <div class="bg-white rounded-2xl max-w-sm w-full mx-4 overflow-hidden shadow-2xl">
+            <div class="bg-slate-900 p-6 text-white text-center">
+                <i class="fas fa-user-shield text-3xl mb-2"></i>
+                <h3 class="font-bold text-lg">Admin Access</h3>
+                <p class="text-xs text-slate-400">SEMI Karnataka Chapter Management</p>
+            </div>
+            <div class="p-8">
+                <div class="mb-4">
+                    <label class="block text-[10px] font-black uppercase text-slate-500 mb-2">Security Passcode</label>
+                    <input type="password" id="adminPass" class="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-semi-navy focus:ring-2 focus:ring-semi-navy/20 outline-none transition" placeholder="••••••••">
+                </div>
+                <button id="loginSubmitBtn" onclick="handleLogin()" class="w-full bg-semi-navy text-white font-bold py-3 rounded-lg hover:opacity-90 transition shadow-lg flex items-center justify-center">
+                    <span>VERIFY & ACCESS</span>
+                </button>
+                <p id="loginError" class="text-red-600 text-[10px] font-bold mt-4 text-center hidden uppercase tracking-wider">Invalid Authentication</p>
+            </div>
+            <div class="p-4 bg-slate-50 border-t border-slate-100 text-center">
+                <button onclick="closeModal('adminModal')" class="text-slate-400 text-[10px] font-bold hover:text-slate-600 uppercase">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="bg-white border-b-4 border-semi-navy sticky top-0 z-50 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-20 items-center">
+                <div class="flex items-center space-x-4">
+                    <img src="https://semi.org.in/wp-content/uploads/2021/08/semi_logo.png" 
+                         onerror="this.src='https://via.placeholder.com/200x80?text=SEMI+LOGO'" 
+                         alt="SEMI Logo" class="h-14 w-auto">
+                    <div class="border-l-2 border-slate-200 pl-4">
+                        <h1 class="font-extrabold text-lg tracking-tight text-semi-navy leading-none uppercase">KARNATAKA CHAPTER</h1>
+                        <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-500">Journal Club Central</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div id="adminControls" class="admin-only flex items-center space-x-4">
+                        <button onclick="document.getElementById('fileInput').click()" class="text-[10px] font-bold border-2 border-semi-navy text-semi-navy px-4 py-2 rounded-lg hover:bg-semi-navy hover:text-white transition">
+                            <i class="fas fa-upload mr-2"></i> SYNC EXCEL
+                        </button>
+                        <input type="file" id="fileInput" class="hidden" accept=".xlsx, .xls, .csv">
+                        <button onclick="summarizeAllSessions()" class="text-[10px] font-black bg-semi-navy text-white px-4 py-2 rounded-lg hover:opacity-90 transition shadow-sm">
+                            ✨ TRENDS
+                        </button>
+                        <button onclick="logout()" class="text-slate-400 hover:text-red-600 transition p-2">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </button>
+                    </div>
+                    <button id="loginBtn" onclick="openModal('adminModal')" class="w-10 h-10 rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-semi-navy transition flex items-center justify-center">
+                        <i class="fas fa-lock"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <header class="hero-pattern py-12 border-b border-slate-100">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <h2 class="text-xs font-black uppercase tracking-[0.4em] text-semi-navy mb-4">Academic Masterclass</h2>
+            <h1 class="text-4xl md:text-5xl font-black text-slate-900 mb-4 uppercase tracking-tighter">
+                Resident <span class="text-semi-navy">Journal Club</span>
+            </h1>
+            <p class="text-slate-800 font-semibold mb-6 max-w-3xl mx-auto leading-relaxed">
+                Advancing Emergency Medicine through critical appraisal and evidence-based discussion. Hosted by the Karnataka State Chapter of SEMI.
+            </p>
+            <p id="statsDisplay" class="text-slate-500 text-sm font-bold uppercase tracking-widest">
+                Connecting to SEMI Cloud...
+            </p>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 py-12">
+        <div id="sessionsContainer" class="space-y-16">
+            <div class="text-center py-20 text-slate-400">
+                <i class="fas fa-spinner fa-spin text-3xl mb-4"></i>
+                <p>Initializing Academic Records...</p>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-slate-900 text-white py-12 mt-20">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <p id="adminBadge" class="text-slate-600 text-[10px] uppercase font-bold tracking-widest italic mb-4">VIEWER MODE</p>
+            <p class="text-slate-500 text-[10px] uppercase font-bold tracking-widest">
+                SEMI Karnataka State Chapter | Enhanced by Gemini AI
+            </p>
+        </div>
+    </footer>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Environment Config
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'semi-karnataka-jc';
+        const apiKey = ""; 
+
+        let currentData = [];
+        let isAdmin = false;
+        let currentUser = null;
+
+        // --- AUTH INITIALIZATION (Rule 3) ---
+        async function initAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (err) {
+                console.error("Auth Error:", err);
+            }
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            if (user) {
+                // Once authenticated, subscribe to data (Rule 3)
+                subscribeToData();
+                isAdmin = localStorage.getItem('semi_admin') === 'true';
+                updateAdminUI();
+            }
+        });
+
+        // --- CLOUD DATA SYNC (Rule 1 & 2) ---
+        function subscribeToData() {
+            if (!currentUser) return;
+            
+            // Path corrected to have even number of segments (Rule 1)
+            // Path: /artifacts/{appId}/public/data/{collectionName}/{documentId}
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'sessions_collection', 'main_data');
+            
+            onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data().sessions || [];
+                    renderSessions(data);
+                } else {
+                    renderSessions([]);
+                }
+            }, (err) => {
+                console.error("Firestore Listen Error:", err);
+            });
+        }
+
+        async function saveToCloud(data) {
+            if (!currentUser || !isAdmin) return;
+            try {
+                // Path corrected to have even number of segments (Rule 1)
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'sessions_collection', 'main_data');
+                await setDoc(docRef, { sessions: data, lastUpdated: new Date().toISOString() });
+                console.log("Cloud Updated Successfully");
+            } catch (err) {
+                console.error("Save Error:", err);
+            }
+        }
+
+        // --- GLOBAL FUNCTIONS FOR BUTTONS ---
+        window.handleLogin = function() {
+            const pass = document.getElementById('adminPass').value;
+            const error = document.getElementById('loginError');
+            
+            if (pass === "SEMI-KA-2024") {
+                isAdmin = true;
+                localStorage.setItem('semi_admin', 'true');
+                updateAdminUI();
+                closeModal('adminModal');
+                error.classList.add('hidden');
+            } else {
+                error.classList.remove('hidden');
+            }
+        };
+
+        window.logout = function() {
+            isAdmin = false;
+            localStorage.removeItem('semi_admin');
+            updateAdminUI();
+        };
+
+        function updateAdminUI() {
+            const controls = document.getElementById('adminControls');
+            const loginBtn = document.getElementById('loginBtn');
+            const badge = document.getElementById('adminBadge');
+
+            if (isAdmin) {
+                if(controls) controls.style.display = 'flex';
+                if(loginBtn) loginBtn.style.display = 'none';
+                if(badge) {
+                    badge.innerText = "ADMINISTRATOR MODE";
+                    badge.className = "text-semi-navy bg-white/10 inline-block px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest italic mb-4 shadow-sm";
+                }
+            } else {
+                if(controls) controls.style.display = 'none';
+                if(loginBtn) loginBtn.style.display = 'flex';
+                if(badge) {
+                    badge.innerText = "VIEWER MODE";
+                    badge.className = "text-slate-600 text-[10px] uppercase font-bold tracking-widest italic mb-4";
+                }
+            }
+        }
+
+        function renderSessions(data) {
+            const container = document.getElementById('sessionsContainer');
+            const stats = document.getElementById('statsDisplay');
+            if(!container) return;
+            container.innerHTML = '';
+            
+            if (!data || data.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-20 text-slate-400">
+                        <i class="fas fa-folder-open text-4xl mb-4"></i>
+                        <p>No records found in cloud database.</p>
+                        ${isAdmin ? '<p class="text-xs mt-2">Admin: Use "Sync Excel" to populate data.</p>' : ''}
+                    </div>`;
+                if(stats) stats.innerText = "0 SESSIONS FOUND";
+                return;
+            }
+
+            if(stats) stats.innerText = `${data.length} COMPETITIONS ARCHIVED`;
+            currentData = data;
+
+            data.forEach((session, index) => {
+                const winStr = String(session["WINNER"] || "").toUpperCase();
+                const isWinnerB = winStr.includes("TEAM B") || winStr === "B";
+                const isWinnerA = winStr.includes("TEAM A") || winStr === "A";
+
+                const card = `
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden transition-all hover:shadow-md">
+                    <div class="bg-semi-navy p-4 flex justify-between items-center text-white">
+                        <div class="flex items-center space-x-4">
+                            <span class="text-xs font-black bg-white/20 px-2 py-1 rounded">SESSION ${index + 1}</span>
+                            <h3 class="font-bold text-sm uppercase tracking-wider">${session["DATE"] || 'N/A'}</h3>
+                        </div>
+                        <button onclick="getAISummary(\`${(session["TOPIC"] || '').replace(/'/g, "\\'")}\`, \`${(session["TEAM A"] || '').replace(/'/g, "\\'")} vs ${(session["TEAM B"] || '').replace(/'/g, "\\'")}\`)" 
+                                class="text-[10px] font-bold bg-white text-semi-navy px-3 py-1 rounded-full uppercase hover:bg-slate-100 transition shadow-sm">
+                            ✨ AI Appraisal
+                        </button>
+                    </div>
+                    
+                    <div class="p-8">
+                        <h4 class="text-xl font-black text-slate-800 mb-8 border-l-4 border-semi-navy pl-4 uppercase leading-tight">
+                            ${session["TOPIC"] || 'Untitled Topic'}
+                        </h4>
+
+                        <div class="grid lg:grid-cols-2 gap-8 mb-10">
+                            <div class="p-6 rounded-xl border ${isWinnerA ? 'border-2 border-semi-navy bg-blue-50/50 winner-glow relative' : 'border-slate-200 bg-slate-50'}">
+                                ${isWinnerA ? '<div class="absolute -top-3 -right-3 gold-badge px-4 py-1 rounded-lg text-[10px] font-black shadow-md uppercase">Winner</div>' : ''}
+                                <div class="flex justify-between items-start mb-4">
+                                    <span class="text-[10px] font-black ${isWinnerA ? 'text-semi-navy' : 'text-slate-400'} uppercase tracking-widest">Team A</span>
+                                    <span class="text-2xl font-black ${isWinnerA ? 'text-semi-navy' : 'text-slate-400'} italic">${session["TEAM A SCORE (FOR ARTICLE)"] || '-'}</span>
+                                </div>
+                                <h5 class="font-bold text-semi-navy text-lg mb-1 uppercase">${session["TEAM A"] || 'N/A'}</h5>
+                                <p class="text-xs font-semibold text-slate-500 mb-4 uppercase">${session["TEAM A PARTICIPANTS"] || ''}</p>
+                                <div class="pt-4 border-t border-slate-200">
+                                    <p class="text-[9px] font-black text-slate-400 uppercase">Team Moderator</p>
+                                    <p class="text-xs font-bold text-slate-800 uppercase">${session["TEAM A MODERATOR"] || 'N/A'}</p>
+                                </div>
+                            </div>
+
+                            <div class="p-6 rounded-xl border ${isWinnerB ? 'border-2 border-semi-navy bg-blue-50/50 winner-glow relative' : 'border-slate-200 bg-slate-50'}">
+                                ${isWinnerB ? '<div class="absolute -top-3 -right-3 gold-badge px-4 py-1 rounded-lg text-[10px] font-black shadow-md uppercase">Winner</div>' : ''}
+                                <div class="flex justify-between items-start mb-4">
+                                    <span class="text-[10px] font-black ${isWinnerB ? 'text-semi-navy' : 'text-slate-400'} uppercase tracking-widest">Team B</span>
+                                    <span class="text-2xl font-black ${isWinnerB ? 'text-semi-navy' : 'text-slate-400'} italic">${session["TEAM B SCORE (AGAINST ARTICLE)"] || '-'}</span>
+                                </div>
+                                <h5 class="font-bold text-semi-navy text-lg mb-1 uppercase">${session["TEAM B"] || 'N/A'}</h5>
+                                <p class="text-xs font-semibold text-slate-500 mb-4 uppercase">${session["TEAM B PARTICIPANTS"] || ''}</p>
+                                <div class="pt-4 border-t border-slate-200">
+                                    <p class="text-[9px] font-black text-slate-400 uppercase">Team Moderator</p>
+                                    <p class="text-xs font-bold text-slate-800 uppercase">${session["TEAM B MODERATOR"] || 'N/A'}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid md:grid-cols-3 gap-6 pt-8 border-t border-slate-100">
+                            <div class="bg-slate-50 px-4 py-3 rounded-lg border border-slate-100">
+                                <p class="text-[9px] font-black text-slate-400 uppercase mb-1">Committee Moderator</p>
+                                <p class="text-xs font-bold text-slate-800 uppercase">${session["COMMITTEE MODERATOR"] || 'N/A'}</p>
+                            </div>
+                            <div class="bg-slate-50 px-4 py-3 rounded-lg border border-slate-100">
+                                <p class="text-[9px] font-black text-slate-400 uppercase mb-1">Judge 1</p>
+                                <p class="text-xs font-bold text-slate-800 uppercase">${session["JUDGE 1"] || 'N/A'}</p>
+                            </div>
+                            <div class="bg-slate-50 px-4 py-3 rounded-lg border border-slate-100">
+                                <p class="text-[9px] font-black text-slate-400 uppercase mb-1">Judge 2</p>
+                                <p class="text-xs font-bold text-slate-800 uppercase">${session["JUDGE 2"] || 'N/A'}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+                container.innerHTML += card;
+            });
+        }
+
+        // --- EXCEL UPLOAD ---
+        const fileInput = document.getElementById('fileInput');
+        if(fileInput) {
+            fileInput.addEventListener('change', function(e) {
+                if(!isAdmin) return;
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    const binary = evt.target.result;
+                    const workbook = XLSX.read(binary, { type: 'binary' });
+                    const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                    if (json.length > 0) {
+                        saveToCloud(json);
+                    }
+                };
+                reader.readAsBinaryString(file);
+            });
+        }
+
+        // --- GEMINI AI INTEGRATION ---
+        window.openModal = function(id) { 
+            const el = document.getElementById(id);
+            if(el) el.style.display = 'flex'; 
+        };
+        window.closeModal = function(id) { 
+            const el = document.getElementById(id);
+            if(el) el.style.display = 'none'; 
+        };
+
+        async function callGemini(prompt, retries = 5, delay = 1000) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const systemPrompt = "You are a senior Emergency Medicine academic consultant for SEMI Karnataka. Provide evidence-based clinical summaries.";
+            const payload = { 
+                contents: [{ parts: [{ text: prompt }] }], 
+                systemInstruction: { parts: [{ text: systemPrompt }] } 
+            };
+
+            try {
+                const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const data = await response.json();
+                return data.candidates?.[0]?.content?.parts?.[0]?.text || "No response received.";
+            } catch (error) {
+                if (retries > 0) {
+                    await new Promise(r => setTimeout(r, delay));
+                    return callGemini(prompt, retries - 1, delay * 2);
+                }
+                return "AI assistant is currently unavailable.";
+            }
+        }
+
+        window.getAISummary = async function(topic, teams) {
+            openModal('aiModal');
+            const loadState = document.getElementById('loadingState');
+            const responseText = document.getElementById('aiResponseText');
+            if(loadState) loadState.classList.remove('hidden');
+            if(responseText) responseText.innerHTML = '';
+            
+            const response = await callGemini(`Provide a clinical appraisal for: ${topic}. Session participants: ${teams}. Focus on EM resident learning.`);
+            if(loadState) loadState.classList.add('hidden');
+            if(responseText) responseText.innerHTML = response.replace(/\n/g, '<br>');
+        };
+
+        window.summarizeAllSessions = async function() {
+            if(!isAdmin) return;
+            openModal('aiModal');
+            const loadState = document.getElementById('loadingState');
+            const responseText = document.getElementById('aiResponseText');
+            if(loadState) loadState.classList.remove('hidden');
+            if(responseText) responseText.innerHTML = '';
+
+            const topics = currentData.map(d => d.TOPIC).join(", ");
+            const response = await callGemini(`Review these EM topics and summarize the curriculum themes for Karnataka residents: ${topics}`);
+            if(loadState) loadState.classList.add('hidden');
+            if(responseText) responseText.innerHTML = response.replace(/\n/g, '<br>');
+        };
+
+        // Start everything
+        initAuth();
+    </script>
+</body>
+</html>
